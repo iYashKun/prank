@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>‏</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #000000 !important;
+      overflow: hidden;
+      cursor: none !important;
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: none;
+    }
+    body.show-cursor {
+      cursor: default !important;
+    }
+    body.show-cursor * {
+      cursor: default !important;
+    }
+    #black {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      z-index: 2147483647;
+    }
+  </style>
+</head>
+<body>
+  <div id="black"></div>
+
+  <script>
+    // ===================== PURE BLACK + CURSOR HIDDEN =====================
+    document.documentElement.style.cursor = "none";
+    document.body.style.cursor = "none";
+    document.body.style.background = "#000";
+
+    let prankTriggered = false;
+    let cursorRestored = false;
+    let audioCtx = null;
+    let oscillators = [];
+    let gainNode = null;
+
+    // ===================== LOUD CONTINUOUS ALARM (Web Audio) =====================
+    function startLoudAlarm() {
+      if (prankTriggered) return;
+      prankTriggered = true;
+
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        gainNode = audioCtx.createGain();
+        gainNode.gain.value = 0.85;
+        gainNode.connect(audioCtx.destination);
+
+        // Multiple harsh oscillators for maximum annoyance
+        const freqs = [220, 440, 660, 880, 1100, 1320];
+        freqs.forEach((f, i) => {
+          const osc = audioCtx.createOscillator();
+          osc.type = i % 2 === 0 ? "sawtooth" : "square";
+          osc.frequency.value = f;
+          osc.connect(gainNode);
+          osc.start();
+          oscillators.push(osc);
+        });
+
+        // Rapid frequency modulation (siren effect)
+        let t = 0;
+        setInterval(() => {
+          if (!audioCtx) return;
+          t += 0.15;
+          oscillators.forEach((osc, i) => {
+            const base = [220, 440, 660, 880, 1100, 1320][i];
+            osc.frequency.setValueAtTime(
+              base + Math.sin(t + i) * 180 + Math.random() * 40,
+              audioCtx.currentTime
+            );
+          });
+        }, 40);
+
+        // Extra volume boost attempt
+        gainNode.gain.setValueAtTime(0.9, audioCtx.currentTime);
+      } catch (e) {
+        // silent fail – still black screen is the prank
+      }
+    }
+
+    // ===================== ALSO TRY EXTERNAL MUSIC =====================
+    function tryExternalMusic() {
+      const a = new Audio("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3");
+      a.volume = 1.0;
+      a.loop = true;
+      a.play().catch(() => {});
+    }
+
+    // ===================== TRIGGER ON ANY INPUT =====================
+    function triggerPrank(e) {
+      if (cursorRestored) return;
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      }
+      startLoudAlarm();
+      tryExternalMusic();
+    }
+
+    // Keyboard – any key except Esc triggers, Esc restores cursor
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Escape" || e.key === "Escape") {
+        e.preventDefault();
+        restoreCursor();
+        return;
+      }
+      triggerPrank(e);
+    }, true);
+
+    window.addEventListener("keyup", (e) => {
+      if (e.code !== "Escape") triggerPrank(e);
+    }, true);
+
+    // Mouse / Pointer / Touch / Wheel – everything
+    const events = [
+      "mousedown", "mouseup", "click", "dblclick", "contextmenu",
+      "pointerdown", "pointerup", "pointermove", "pointercancel",
+      "touchstart", "touchend", "touchmove", "touchcancel",
+      "wheel", "mousemove"
+    ];
+    events.forEach(name => {
+      window.addEventListener(name, triggerPrank, { capture: true, passive: false });
+    });
+
+    // ===================== RESTORE CURSOR ONLY ON ESC =====================
+    function restoreCursor() {
+      cursorRestored = true;
+      document.exitPointerLock?.();
+      document.body.classList.add("show-cursor");
+      document.documentElement.style.cursor = "default";
+      document.body.style.cursor = "default";
+      // Stop the noise if they want (optional – keep it going for stronger prank)
+      // oscillators.forEach(o => o.stop());
+    }
+
+    // ===================== TRY POINTER LOCK FOR EXTRA HIDE =====================
+    function attemptLock() {
+      if (cursorRestored) return;
+      try {
+        document.body.requestPointerLock?.();
+      } catch (e) {}
+    }
+
+    // First interaction will also lock
+    document.addEventListener("click", attemptLock, { once: true });
+    setTimeout(attemptLock, 300);
+
+    // Keep page pure black
+    setInterval(() => {
+      document.body.style.background = "#000";
+      document.documentElement.style.background = "#000";
+      if (!cursorRestored) {
+        document.body.style.cursor = "none";
+        document.documentElement.style.cursor = "none";
+      }
+    }, 200);
+
+    // Block common ways to escape
+    document.addEventListener("contextmenu", e => e.preventDefault());
+    document.addEventListener("selectstart", e => e.preventDefault());
+    window.addEventListener("beforeunload", e => {
+      // optional scare
+    });
+  </script>
+</body>
+</html>
